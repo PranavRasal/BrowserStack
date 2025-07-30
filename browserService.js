@@ -1,11 +1,10 @@
 import { spawn, execSync } from "child_process";
-import fs from "fs";
 
 export class BrowserService {
     constructor() {
         this.processes = {
             chrome: null,
-            firefox: null,
+            edge: null,
         };
     }
 
@@ -16,11 +15,13 @@ export class BrowserService {
 
         let proc;
         if (browser === "chrome") {
-            proc = spawn("C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe", ["--new-window", url], {
+            proc = spawn("google-chrome", ["--new-tab", url], {
                 detached: true,
             });
-        } else if (browser === "firefox") {
-            proc = spawn("firefox", [url], { detached: true });
+        } else if (browser === "edge") {
+            proc = spawn("microsoft-edge", ["--new-tab", url], {
+                detached: true,
+            });
         } else {
             return "Unsupported browser.";
         }
@@ -33,44 +34,44 @@ export class BrowserService {
         if (!this.processes[browser]) return `${browser} is not running.`;
 
         try {
-            execSync(`pkill ${browser}`);
-            this.processes[browser] = null;
-            return `${browser} stopped.`;
+            if (browser === "edge") {
+                execSync(`pkill -9 -f msedge`, { stdio: "ignore" });
+            } else if (browser === "chrome") {
+                execSync(`pkill -9 -f chrome`, { stdio: "ignore" });
+            } else {
+                return "Unsupported browser.";
+            }
         } catch (err) {
-            return `Error stopping ${browser}: ${err.message}`;
+            // pkill returns non-zero exit code when no processes are found
+            // This is expected behavior, so we can ignore this error
         }
+
+        this.processes[browser] = null;
+        return `${browser} stopped.`;
     }
 
     getActiveTab(browser) {
         try {
-            if (browser === "chrome") {
-                const output = execSync(
-                    `lsof -c chrome | grep -o 'http[s]*://[^ ]*' | head -n 1`
+            if (browser === "chrome" || browser === "edge") {
+                const processName = browser === "edge" ? "msedge" : "chrome";
+
+                // Get the main browser process with URL in command line
+                const psOutput = execSync(
+                    `ps aux | grep -E "${processName}.*http" | grep -v grep | head -n 1`
                 )
                     .toString()
                     .trim();
-                return output || "No active tab found.";
-            } else if (browser === "firefox") {
-                const sessionPath = `${process.env.HOME}/.mozilla/firefox/`;
-                const profiles = fs
-                    .readdirSync(sessionPath)
-                    .filter(
-                        (f) =>
-                            f.endsWith(".default") ||
-                            f.endsWith(".default-release")
-                    );
-                const profilePath =
-                    profiles.length > 0
-                        ? `${sessionPath}${profiles[0]}/sessionstore-backups/recovery.jsonlz4`
-                        : null;
 
-                if (profilePath && fs.existsSync(profilePath)) {
-                    return "Active tab fetching not implemented fully for Firefox (requires decoding JSONLZ4).";
+                if (!psOutput) {
+                    return "No active tab found.";
                 }
-                return "No session found.";
-            } else {
-                return "Unsupported browser.";
+
+                // Extract URL from the command line using regex
+                const urlMatch = psOutput.match(/https?:\/\/[^\s]+/);
+                return urlMatch ? urlMatch[0] : "No active tab found.";
             }
+
+            return "Unsupported browser.";
         } catch {
             return "Could not determine active tab.";
         }
@@ -84,8 +85,8 @@ export class BrowserService {
         try {
             if (browser === "chrome") {
                 execSync(`rm -rf ~/.config/google-chrome/Default/*`);
-            } else if (browser === "firefox") {
-                execSync(`rm -rf ~/.mozilla/firefox/*.default*`);
+            } else if (browser === "edge") {
+                execSync(`rm -rf ~/.config/microsoft-edge/Default/*`);
             } else {
                 return "Unsupported browser.";
             }
