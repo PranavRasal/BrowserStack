@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <title>Live Log Watcher</title>
+        <style>
+            body {
+                font-family: monospace;
+                padding: 1rem;
+                background: #111;
+                color: #0f0;
+            }
+            pre {
+                white-space: pre-wrap;
+                word-break: break-word;
+            }
+        </style>
+    </head>
+    <body>
+        <h2>📜 Live Logs</h2>
+        <pre id="logDisplay"></pre>
+
+        <script src="/socket.io/socket.io.js"></script>
+        <script>
+            const socket = io();
+            const logDisplay = document.getElementById("logDisplay");
+
+            socket.on("logUpdate", (data) => {
+                logDisplay.textContent += data;
+                logDisplay.scrollTop = logDisplay.scrollHeight;
+            });
+        </script>
+    </body>
+</html>
